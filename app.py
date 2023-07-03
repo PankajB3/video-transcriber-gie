@@ -15,8 +15,10 @@ from pydub import AudioSegment
 from mutagen.mp3 import MP3
 from moviepy.editor import *
 
+from pinecone_store import *
 
 os.environ["OPENAI_API_KEY"] = ""
+directory = "subtitle"
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -39,7 +41,11 @@ def segments_one_minute(mp3_file_path, video_id):
         audio_clip = AudioFileClip(mp3_file_path)
         if index >= n:
             flag = True
-            index = n
+            # index = n
+            # print(index)
+        
+        if flag:
+            break;            
         
         temp = audio_clip.subclip(start, index)
         temp_file = os.path.join(os.getcwd()+f'/{video_id}/{counter}.mp3')
@@ -49,8 +55,7 @@ def segments_one_minute(mp3_file_path, video_id):
         start = index
         audio_clip.close()
         
-        if flag:
-            break;
+
         
         index += 60
     return path        
@@ -93,41 +98,6 @@ def transcribe_video(mp3_file_path, video_id):
             transcribed_text.append(transcript)
         return transcribed_text
 
-# def videoToMp3(url):
-#     print(url)
-#     # creating temporary directory for storing mp3 files
-#     temp_Dir = tempfile.TemporaryDirectory()
-    
-#     # extracting id from youtube video
-#     query = urlparse(url).query
-#     params = parse_qs(query)
-#     video_id = params["v"][0]
-    
-#     print(video_id)
-    
-#     # download the video from youtube using URL
-#     yt_video = YouTube(url)
-    
-#     print("#################\n\n 43 \n\n###################")
-    
-#     # extracting audio from video file  
-#     audio_stream = yt_video.streams.filter(progressive=True, file_extension='mp4').order_by().desc().first().download()
-#     print("#################\n\n 47 \n\n###################")
-    
-#     # audio_stream.download(output_path=temp_Dir)
-    
-#     print(audio_stream)
-#     print("#################\n\n 48 \n\n###################")
-    
-#     # convert audio output to mp3
-#     audio_path = os.path.join(temp_Dir, audio_stream.default_filename)
-#     audio_clip = AudioFileClip(audio_path)
-#     audio_clip.write_audiofile(os.path.join(temp_Dir, f"{video_id}.mp3"))
-    
-#     # storing path of mp3 file
-#     mp3_file_path = f"{temp_Dir}/{video_id}.mp3"
-    
-#     return mp3_file_path
 
 def yt_dlt_method(url):
     print(url)
@@ -160,29 +130,34 @@ def yt_dlt_method(url):
     
     return temp_file_path
 
+
+def store_subtitle_txt(video_id, transcript):
+    file_name = f"{video_id}.txt"
+    subtitle_file_path = os.path.join(directory, file_name)
+    # check if directory exists
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    # Write to the file
+    with open(subtitle_file_path, "w") as file:
+        file.write(transcript)
+        
+        
 # url = "https://www.youtube.com/watch?v=eGPRo82ry0I"
-url ="https://www.youtube.com/watch?v=QdDoFfkVkcw"
-# loader = YoutubeLoader.from_youtube_url(url)
-# result = loader.load()
-# print(result)
+# url ="https://www.youtube.com/watch?v=QdDoFfkVkcw"
+url = "https://www.youtube.com/watch?v=h0DHDp1FbmQ"
 
-
-# mp3_path = videoToMp3(url)
-# video_summary = transcribe_video(mp3_path)
-# os.remove(mp3_path)
-# print(video_summary)
-
+query = urlparse(url).query
+params = parse_qs(query)
+video_id = params["v"][0]
 
 mp3_path = yt_dlt_method(url)
-print("################\n\n 177 \n\n###################")
-transcript_video = transcribe_video(mp3_path, "QdDoFfkVkcw")
-print(transcript_video)
+transcript_video = transcribe_video(mp3_path, "h0DHDp1FbmQ")
+print(type(transcript_video))
 
+store_subtitle_txt(video_id, transcript_video)
 
-# video_summary = transcribe_video(mp3_path)
-# os.remove(mp3_path)
-# print(video_summary)
-# print(mp3_file_path)
+#! store data in pincone
+store_transcribe_to_pinecone(url, video_id)
 
 @app.route('/')
 def index():
