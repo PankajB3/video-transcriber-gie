@@ -2,8 +2,8 @@ import openai
 import os
 import tempfile
 import yt_dlp
-import time
-import mutagen
+import shutil
+import io
 
 from flask import Flask, jsonify, request
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -17,7 +17,7 @@ from moviepy.editor import *
 
 from pinecone_store import *
 
-os.environ["OPENAI_API_KEY"] = ""
+os.environ["OPENAI_API_KEY"] = "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"
 directory = "subtitle"
 
 app = Flask(__name__)
@@ -25,9 +25,6 @@ cors = CORS(app)
 
 # segment the mp3 into smaller versions of 10 minutes
 def segments_one_minute(mp3_file_path, video_id):
-    # mp3_size_sec = os.path.getsize(mp3_file_path)
-    # print("size of mp3 file", mp3_size_sec)
-    # whisper_default_size = 25*1024*1024 #25 MB in bytes
     mp3_audio = AudioFileClip(mp3_file_path)
     flag = False
     index = 60
@@ -55,20 +52,18 @@ def segments_one_minute(mp3_file_path, video_id):
         start = index
         audio_clip.close()
         
-
-        
         index += 60
     return path        
     
     
 def transcribe_video(mp3_file_path, video_id):
     #calculate size of mp3
-    mp3file_size_bytes = os.path.getsize(mp3_path)
+    mp3file_size_bytes = os.path.getsize(mp3_file_path)
     print("size of mp3 file", mp3file_size_bytes)
     whisper_default_size = 25*1024*1024 #25 MB in bytes
     
     if(mp3file_size_bytes < whisper_default_size): # check if given file is smaller than 25 MB
-        openai.api_key=""
+        openai.api_key="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"
         with open(mp3_file_path,"rb") as audio_file:
             transcript = openai.Audio.transcribe(
                 file=audio_file,
@@ -76,6 +71,7 @@ def transcribe_video(mp3_file_path, video_id):
                 response_format="text",
                 language="en"
             )
+        os.remove(mp3_file_path)
         return transcript
     else:
         transcribed_text = []
@@ -86,7 +82,7 @@ def transcribe_video(mp3_file_path, video_id):
             # audio_clip = AudioFileClip(audio_segment_path)
             # duration = audio_clip.duration
             # audio_clip.close()
-            openai.api_key=""
+            openai.api_key="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"
             with open(audio_segment_path,"rb") as audio_file:
                 transcript = openai.Audio.transcribe(
                     file=audio_file,
@@ -96,9 +92,12 @@ def transcribe_video(mp3_file_path, video_id):
                 )
             # print(index + " => " + transcript)
             transcribed_text.append(transcript)
+        shutil.rmtree(segmented_files_dir)
+        os.remove(mp3_file_path)
         return transcribed_text
 
 
+# returns the path of mp3 file downloaded of the given url
 def yt_dlt_method(url):
     print(url)
     # creating temporary directory for storing mp3 files
@@ -130,33 +129,47 @@ def yt_dlt_method(url):
     
     return temp_file_path
 
-
+# writing the transcript output in a text file
 def store_subtitle_txt(video_id, transcript):
     file_name = f"{video_id}.txt"
+    
+    # check type of transcript paramter
+    if isinstance(transcript, list):
+        video_script = "\n".join(transcript)
+    else:
+        video_script = transcript
+    
     subtitle_file_path = os.path.join(directory, file_name)
     # check if directory exists
     if not os.path.exists(directory):
         os.makedirs(directory)
     # Write to the file
-    with open(subtitle_file_path, "w") as file:
-        file.write(transcript)
+    with io.open(subtitle_file_path, "w", encoding="utf-8") as file:
+        file.write(video_script)
         
         
-# url = "https://www.youtube.com/watch?v=eGPRo82ry0I"
+url = "https://www.youtube.com/watch?v=eGPRo82ry0I"
 # url ="https://www.youtube.com/watch?v=QdDoFfkVkcw"
-url = "https://www.youtube.com/watch?v=h0DHDp1FbmQ"
+# url = "https://www.youtube.com/watch?v=h0DHDp1FbmQ"
 
+# fetching video-id out of url
 query = urlparse(url).query
 params = parse_qs(query)
 video_id = params["v"][0]
 
-mp3_path = yt_dlt_method(url)
-transcript_video = transcribe_video(mp3_path, "h0DHDp1FbmQ")
-print(type(transcript_video))
+mp3_path = yt_dlt_method(url)    # path of mp3 file downloaded out of url
 
-store_subtitle_txt(video_id, transcript_video)
+# creating a thread for transcribe_video function
+transcript_video = transcribe_video(mp3_path, video_id) 
 
-#! store data in pincone
+print("\n##############################\n",transcript_video) 
+
+video_txt = transcript_video 
+
+
+store_subtitle_txt(video_id, video_txt)  
+
+# store data in pincone
 store_transcribe_to_pinecone(url, video_id)
 
 @app.route('/')
