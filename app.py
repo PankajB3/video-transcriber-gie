@@ -17,7 +17,7 @@ from moviepy.editor import *
 
 from pinecone_store import *
 
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = ""
 directory = "subtitle"
 
 app = Flask(__name__)
@@ -63,7 +63,7 @@ def transcribe_video(mp3_file_path, video_id):
     whisper_default_size = 25*1024*1024 #25 MB in bytes
     
     if(mp3file_size_bytes < whisper_default_size): # check if given file is smaller than 25 MB
-        openai.api_key="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"
+        openai.api_key=""
         with open(mp3_file_path,"rb") as audio_file:
             transcript = openai.Audio.transcribe(
                 file=audio_file,
@@ -82,7 +82,7 @@ def transcribe_video(mp3_file_path, video_id):
             # audio_clip = AudioFileClip(audio_segment_path)
             # duration = audio_clip.duration
             # audio_clip.close()
-            openai.api_key="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"
+            openai.api_key=""
             with open(audio_segment_path,"rb") as audio_file:
                 transcript = openai.Audio.transcribe(
                     file=audio_file,
