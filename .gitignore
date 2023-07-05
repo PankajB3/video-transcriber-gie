@@ -4,3 +4,4 @@ __pycache__/
 *.txt
 subtitle
 help.py
+.env
